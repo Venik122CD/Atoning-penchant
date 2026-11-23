@@ -318,7 +318,7 @@ public class AtoningPenchantMenu extends AbstractContainerMenu {
     // ------------------------------------------------------------------ список для отображения
 
     private Stream<Holder<Enchantment>> streamOrdered() {
-        Stream<Holder<Enchantment>> all = enchantments.holders();
+        Stream<Holder<Enchantment>> all = enchantments.holders().map(holder -> (Holder<Enchantment>) holder);
         Optional<HolderSet.Named<Enchantment>> order = enchantments.getTag(EnchantmentTags.TOOLTIP_ORDER);
         if (order.isPresent()) {
             HolderSet.Named<Enchantment> set = order.get();
