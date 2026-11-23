@@ -15,6 +15,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 repositories {
     mavenLocal()
     maven { url = "https://maven.teamabnormals.com/" }
+    maven { url = "https://www.cursemaven.com" }
 }
 
 neoForge {
@@ -38,10 +39,8 @@ neoForge {
 }
 
 dependencies {
-    // Caverns & Chasms: кладём его jar в папку ./libs (см. README).
-    // Нужен ТОЛЬКО для компиляции, в наш jar он не упаковывается.
-    compileOnly fileTree(dir: "libs", include: "caverns_and_chasms*.jar")
-    // C&C ссылается на Blueprint (Team Abnormals) в сигнатурах своих классов.
+    // Compile against Caverns & Chasms without bundling it into this mod.
+    compileOnly "curse.maven:caverns-and-chasms-438005:8891838"
     compileOnly "com.teamabnormals:blueprint:${project.mc_version}-${project.blueprint}"
 }
 
