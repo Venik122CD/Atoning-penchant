@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "com.atoningpenchant.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "AtoningTableBlockMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

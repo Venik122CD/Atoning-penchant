@@ -1,0 +1,46 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "${mod_license}"
+
+[[mixins]]
+    config = "atoning_penchant.mixins.json"
+
+[[mods]]
+    modId = "${mod_id}"
+    version = "${mod_version}"
+    displayName = "${mod_name}"
+    authors = "${mod_authors}"
+    description = '''
+    Compatibility between Caverns & Chasms and Penchant.
+    The Atoning Table gets the Penchant-style enchantment list,
+    but you still pay with item durability and Spinel instead of XP.
+    '''
+
+[[dependencies.atoning_penchant]]
+    modId = "minecraft"
+    type = "required"
+    versionRange = "[${mc_version}]"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.atoning_penchant]]
+    modId = "neoforge"
+    type = "required"
+    versionRange = "[21.1.0,)"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.atoning_penchant]]
+    modId = "caverns_and_chasms"
+    type = "required"
+    versionRange = "[${cc_min_version},)"
+    ordering = "AFTER"
+    side = "BOTH"
+
+# Penchant - Fabric-мод, на NeoForge он работает через Sinytra Connector,
+# в списке модов он виден под своим обычным id "penchant".
+[[dependencies.atoning_penchant]]
+    modId = "penchant"
+    type = "required"
+    ordering = "AFTER"
+    side = "BOTH"
