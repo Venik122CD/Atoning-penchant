@@ -189,14 +189,14 @@ public class AtoningPenchantMenu extends AbstractContainerMenu {
     public void setUnlockedEnchantments(Set<Holder<Enchantment>> unlocked) {
         this.unlocked = Set.copyOf(unlocked);
         Set<Holder<Enchantment>> all = new HashSet<>(unlocked);
-        enchantments.get(EnchantmentTags.IN_ENCHANTING_TABLE).ifPresent(set -> set.forEach(all::add));
+        enchantments.getTag(EnchantmentTags.IN_ENCHANTING_TABLE).ifPresent(set -> set.forEach(all::add));
         this.available = all;
         refreshDisplayed();
     }
 
     private Set<Holder<Enchantment>> allEnchantments() {
         Set<Holder<Enchantment>> all = new HashSet<>();
-        enchantments.listElements().forEach(all::add);
+        enchantments.holders().forEach(all::add);
         return all;
     }
 
@@ -318,8 +318,8 @@ public class AtoningPenchantMenu extends AbstractContainerMenu {
     // ------------------------------------------------------------------ список для отображения
 
     private Stream<Holder<Enchantment>> streamOrdered() {
-        Stream<Holder<Enchantment>> all = enchantments.listElements().map(holder -> (Holder<Enchantment>) holder);
-        Optional<HolderSet.Named<Enchantment>> order = enchantments.get(EnchantmentTags.TOOLTIP_ORDER);
+        Stream<Holder<Enchantment>> all = enchantments.holders();
+        Optional<HolderSet.Named<Enchantment>> order = enchantments.getTag(EnchantmentTags.TOOLTIP_ORDER);
         if (order.isPresent()) {
             HolderSet.Named<Enchantment> set = order.get();
             return Stream.concat(set.stream(), all.filter(holder -> !set.contains(holder)));
