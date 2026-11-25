@@ -305,8 +305,14 @@ public class AtoningPenchantMenu extends AbstractContainerMenu {
         return enchantments.asHolderIdMap().getId(enchantment) * AtoningCosts.TIER_COUNT + tierIndex;
     }
 
+    /** Требование Penchant по книгам (A). */
     public int getBookRequirement(Holder<Enchantment> enchantment) {
         return PenchantBridge.getDefinition(player.registryAccess(), enchantment).bookRequirement();
+    }
+
+    /** Сколько книг нужно на выбранном кинжалом уровне: A, A + 25% или A + 50%. */
+    public int getRequiredBooks(Holder<Enchantment> enchantment, int tierIndex) {
+        return AtoningCosts.requiredBooks(getBookRequirement(enchantment), AtoningCosts.effectiveTier(enchantment, tierIndex));
     }
 
     public List<Holder<Enchantment>> getIncompatible(ItemStack stack, Holder<Enchantment> enchantment) {
@@ -390,13 +396,13 @@ public class AtoningPenchantMenu extends AbstractContainerMenu {
 
         boolean creative = player.hasInfiniteMaterials();
         int tier = AtoningCosts.effectiveTier(enchantment, requestedTier);
-        int fuel = AtoningCosts.fuelCost(tier);
+        int fuel = AtoningCosts.FUEL_COST;
 
         if (!canApply(stack, enchantment)) return false;
         if (!creative) {
             if (!available.contains(enchantment)) return false;
             if (!stack.isDamageableItem()) return false;
-            if (getBookCount() < getBookRequirement(enchantment)) return false;
+            if (getBookCount() < getRequiredBooks(enchantment, tier)) return false;
             if (getLapisCount() < fuel || getSpinelCount() < fuel) return false;
         }
 
@@ -428,7 +434,7 @@ public class AtoningPenchantMenu extends AbstractContainerMenu {
             player.awardStat(Stats.ENCHANT_ITEM);
             if (player instanceof ServerPlayer serverPlayer) {
                 // сломанный предмет = пустой стек: это условие достижения "Atone-Deaf"
-                CCCriteriaTriggers.ATONED_ITEM.get().trigger(serverPlayer, result, fuel);
+                CCCriteriaTriggers.ATONED_ITEM.get().trigger(serverPlayer, result, tier + 1);
             }
 
             level.playSound(null, pos, CCSoundEvents.ATONING_TABLE_USE.get(), SoundSource.BLOCKS,

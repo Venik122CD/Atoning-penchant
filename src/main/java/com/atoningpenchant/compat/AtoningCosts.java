@@ -7,13 +7,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 
 /**
- * Правила «уровней сложности» Атонинг-стола.
+ * Правила «уровней сложности» Атонинг-стола (выбираются кинжалом).
  *
- * <p>Цены - ровно как в Caverns & Chasms: уровень i (1..3) стоит i лазурита + i шпинели и забирает
- * {@code min(100%, 25%*i + random*27.5%)} максимальной прочности предмета.</p>
- *
- * <p>Новое по сравнению с C&C - что получаешь: чем выше уровень, тем лучше «заряжена» чара в системе
- * прокачки Penchant. Все числа этого класса можно спокойно править.</p>
+ * <p>Лазурит и шпинель - фиксированная цена за одно зачарование ({@link #FUEL_COST}). Прочность - как в
+ * Caverns & Chasms: уровень i (1..3) забирает {@code min(100%, 25%*i + random*27.5%)} максимальной прочности.
+ * Чем выше уровень, тем больше нужно книг рядом (A, A+25%, A+50%, где A - требование Penchant) и тем лучше
+ * «заряжена» чара в системе прокачки Penchant. Все числа класса можно спокойно править.</p>
  */
 public final class AtoningCosts {
     private AtoningCosts() {}
@@ -32,9 +31,19 @@ public final class AtoningCosts {
 
     // ------------------------------------------------------------------ цены (как в C&C)
 
-    /** tierIndex: 0 - лёгкий, 1 - нормальный, 2 - сложный. Сколько лазурита и сколько шпинели. */
-    public static int fuelCost(int tierIndex) {
-        return tierIndex + 1;
+    /** Сколько лазурита и сколько шпинели стоит одно зачарование (на любом уровне). */
+    public static final int FUEL_COST = 1;
+
+    /** Прибавка к требованию по книгам на уровнях: лёгкий +0%, нормальный +25%, сложный +50%. */
+    private static final float[] BOOK_EXTRA = {0.0F, 0.25F, 0.5F};
+
+    /**
+     * Сколько книг нужно рядом со столом. baseRequirement - это A (требование Penchant для чары),
+     * на нормальном уровне A + 0.25*A, на сложном A + 0.5*A (округляется вверх).
+     */
+    public static int requiredBooks(int baseRequirement, int tierIndex) {
+        int tier = Math.max(0, Math.min(TIER_COUNT - 1, tierIndex));
+        return (int) Math.ceil(baseRequirement * (1.0F + BOOK_EXTRA[tier]));
     }
 
     public static float minLossFraction(int tierIndex) {

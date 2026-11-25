@@ -2,7 +2,6 @@ package com.atoningpenchant.client;
 
 import com.atoningpenchant.compat.AtoningCosts;
 import com.atoningpenchant.menu.AtoningPenchantMenu;
-import com.teamabnormals.caverns_and_chasms.core.registry.CCItems;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -11,50 +10,44 @@ import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.core.Holder;
-import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentUtils;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.tags.EnchantmentTags;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
 
+import java.util.ArrayList;
 import java.util.List;
 
-/** Одна кнопка списка чар: цвет зависит от выбранного кинжалом уровня (зелёная / оранжевая / красная). */
+/**
+ * Кнопка списка чар - по устройству то же, что кнопка стола Penchant: спрайт (обычный / неактивный /
+ * подсвеченный), название слева, цена справа, одинаковые цвета. Цвет кнопки зависит от выбранного кинжалом
+ * уровня (зелёная / оранжевая / красная), а в цене показывается нужное число книг.
+ */
 public class EnchantmentRow extends AbstractButton {
-    public static final int WIDTH = 92;
-    public static final int HEIGHT = 20;
+    public static final int WIDTH = 91;
+    public static final int HEIGHT = 12;
 
-    private static final int INSUFFICIENT_COLOR = 0xFFFF5555;
-    private static final int BOOK_COLOR = 0xFFFFAA00;
-    private static final int TEXT_COLOR = 0xFF332E25;
-    private static final int HOVER_COLOR = 0xFFFCFC7E;
-    private static final int CURSE_COLOR = 0xFF891D13;
+    public static final int DISABLED_COLOR = 0xFF685E4A;
+    public static final int INSUFFICIENT_COLOR = 0xFFFF5555;
+    public static final int BOOK_COLOR = 0xFFFFAA00;
+
     private static final int[] TIER_COLORS = {0xFF55FF55, 0xFFFFAA00, 0xFFFF5555};
-
-    private static final ItemStack LAPIS_ICON = new ItemStack(Items.LAPIS_LAZULI);
 
     private final AtoningPenchantMenu menu;
     private final int buttonId;
     private final int tier;
-    private final Component name;
+    private final Component text;
+    private final Component costText;
     private final boolean isCurse;
-    private final boolean showCosts;
-    private final boolean booksOk;
-    private final int bookRequirement;
-    private final int fuel;
-    private final boolean spinelOk;
-    private final boolean lapisOk;
-    private final boolean fuelOk;
-    private final boolean disenchanting;
 
     public EnchantmentRow(int x, int y, AtoningPenchantMenu menu, Holder<Enchantment> enchantment) {
         super(x, y, WIDTH, HEIGHT, enchantment.value().description());
         this.menu = menu;
         this.isCurse = enchantment.is(EnchantmentTags.CURSE);
-        this.disenchanting = menu.isDisenchanting();
+        boolean disenchanting = menu.isDisenchanting();
 
         Player player = Minecraft.getInstance().player;
         boolean creative = player != null && player.hasInfiniteMaterials();
@@ -62,25 +55,35 @@ public class EnchantmentRow extends AbstractButton {
 
         boolean unlocked = menu.isAvailable(enchantment);
         boolean alreadyHas = menu.hasEnchantment(stack, enchantment);
+        boolean canUse = disenchanting || !alreadyHas;
         List<Holder<Enchantment>> incompatible = unlocked && !disenchanting ? menu.getIncompatible(stack, enchantment) : List.of();
-
-        this.bookRequirement = menu.getBookRequirement(enchantment);
-        this.booksOk = creative || menu.getBookCount() >= bookRequirement;
 
         // ---- уровень сложности (для снятия чар не применяется)
         this.tier = disenchanting ? 1 : AtoningCosts.effectiveTier(enchantment, menu.getSelectedTier());
         this.buttonId = menu.getButtonId(enchantment, disenchanting ? 0 : menu.getSelectedTier());
-        this.fuel = AtoningCosts.fuelCost(tier);
-        this.spinelOk = creative || menu.getSpinelCount() >= fuel;
-        this.lapisOk = creative || menu.getLapisCount() >= fuel;
-        this.fuelOk = spinelOk && lapisOk;
-        this.showCosts = unlocked || disenchanting;
+
+        int bookRequirement = disenchanting ? menu.getBookRequirement(enchantment) : menu.getRequiredBooks(enchantment, tier);
+        boolean hasEnoughBooks = creative || menu.getBookCount() >= bookRequirement;
+        int fuel = AtoningCosts.FUEL_COST;
+        boolean hasSpinel = creative || menu.getSpinelCount() >= fuel;
+        boolean hasLapis = creative || menu.getLapisCount() >= fuel;
+        boolean showBookCost = unlocked;
 
         // ---- название (ещё не открытые чары пишутся «галактическим» шрифтом, как в столе зачарований)
         MutableComponent title = enchantment.value().description().copy();
-        boolean canUse = disenchanting || !alreadyHas;
         if (!unlocked && canUse && !disenchanting) title.withStyle(style -> style.withFont(Minecraft.ALT_FONT));
-        this.name = title;
+        this.text = title;
+
+        // ---- цена справа: значок несовместимости и нужное число книг (как у Penchant)
+        List<Component> costTexts = new ArrayList<>(2);
+        if (!incompatible.isEmpty()) {
+            costTexts.add(Component.translatable("widget.atoning_penchant.row.incompatible").withColor(INSUFFICIENT_COLOR));
+        }
+        if (showBookCost) {
+            costTexts.add(Component.literal(Integer.toString(bookRequirement))
+                    .withColor(!canUse ? DISABLED_COLOR : !hasEnoughBooks ? INSUFFICIENT_COLOR : BOOK_COLOR));
+        }
+        this.costText = ComponentUtils.formatList(costTexts, Component.literal(" "));
 
         // ---- подсказка
         if (!canUse) {
@@ -100,22 +103,17 @@ public class EnchantmentRow extends AbstractButton {
                     : enchantment.value().description().copy().withStyle(isCurse ? ChatFormatting.RED : ChatFormatting.GRAY);
 
             if (!incompatible.isEmpty()) {
-                MutableComponent names = Component.empty();
-                for (int i = 0; i < incompatible.size(); i++) {
-                    if (i > 0) names.append(", ");
-                    names.append(incompatible.get(i).value().description());
-                }
-                tooltip.append("\n").append(Component.translatable("widget.atoning_penchant.row.tooltip.incompatible", names)
-                        .withStyle(ChatFormatting.RED));
+                tooltip.append("\n").append(Component.translatable("widget.atoning_penchant.row.tooltip.incompatible",
+                        ComponentUtils.formatList(incompatible, holder -> holder.value().description())).withStyle(ChatFormatting.RED));
             }
 
             tooltip.append("\n").append(Component.translatable("widget.atoning_penchant.row.tooltip.books", bookRequirement)
-                    .withColor(booksOk ? BOOK_COLOR : INSUFFICIENT_COLOR));
+                    .withColor(hasEnoughBooks ? BOOK_COLOR : INSUFFICIENT_COLOR));
 
             if (!disenchanting) {
-                // цены в стиле C&C: серым, если хватает, красным, если нет
-                tooltip.append("\n").append(fuelLine("widget.atoning_penchant.row.tooltip.spinel", fuel, spinelOk));
-                tooltip.append("\n").append(fuelLine("widget.atoning_penchant.row.tooltip.lapis", fuel, lapisOk));
+                // лазурит и шпинель: серым, если хватает, красным, если нет (как цены в C&C)
+                tooltip.append("\n").append(fuelLine("widget.atoning_penchant.row.tooltip.spinel", fuel, hasSpinel));
+                tooltip.append("\n").append(fuelLine("widget.atoning_penchant.row.tooltip.lapis", fuel, hasLapis));
 
                 if (stack.isDamageableItem()) {
                     tooltip.append("\n").append(Component.translatable("widget.atoning_penchant.row.tooltip.durability",
@@ -135,8 +133,8 @@ public class EnchantmentRow extends AbstractButton {
         }
 
         this.active = canUse && (disenchanting
-                ? booksOk
-                : unlocked && incompatible.isEmpty() && booksOk && fuelOk);
+                ? hasEnoughBooks
+                : unlocked && incompatible.isEmpty() && hasEnoughBooks && hasSpinel && hasLapis);
     }
 
     private static Component fuelLine(String key, int amount, boolean enough) {
@@ -148,40 +146,31 @@ public class EnchantmentRow extends AbstractButton {
         graphics.blitSprite(AtoningSprites.BUTTONS[tier].get(active, isHoveredOrFocused()), getX(), getY(), getWidth(), getHeight());
 
         Font font = Minecraft.getInstance().font;
-        int color = active && isHoveredOrFocused() ? HOVER_COLOR : isCurse ? CURSE_COLOR : TEXT_COLOR;
 
-        // строка 1: название (обрезается, если не влезает рядом с иконкой меча)
-        int textX = getX() + 21;
-        graphics.drawString(font, Language.getInstance().getVisualOrder(font.substrByWidth(name, WIDTH - 21 - 3)),
-                textX, getY() + 3, color, false);
-
-        // строка 2: цена - книги, шпинель, лазурит
-        if (showCosts) {
-            int y = getY() + 11;
-            MutableComponent books = Component.empty().append(PenchantFont.BOOK).append(PenchantFont.THIN_SPACE)
-                    .append(Component.literal(Integer.toString(bookRequirement))
-                            .withColor(booksOk ? BOOK_COLOR : INSUFFICIENT_COLOR));
-            graphics.drawString(font, books, textX, y, 0xFF404040, true);
-
-            if (!disenchanting) {
-                int x = textX + font.width(books) + 6;
-                x = drawCost(graphics, font, new ItemStack(CCItems.SPINEL.get()), x, y, spinelOk);
-                drawCost(graphics, font, LAPIS_ICON, x + 4, y, lapisOk);
-            }
+        // цена справа, как у Penchant
+        int costWidth = font.width(costText);
+        if (costWidth > 0) {
+            graphics.drawString(font, costText, getX() + width - 2 - costWidth, getY() + 2, 0xFF404040, true);
         }
+
+        // название слева; если не влезает - обрезаем и ставим "..."
+        int available = width - 2 - 2 - (costWidth > 0 ? costWidth + 3 : 0);
+        Component shown = fit(font, text, available);
+        graphics.drawString(font, shown, getX() + 2, getY() + 2,
+                active && isHoveredOrFocused() ? 0xFFFCFC7E : isCurse ? 0xFF891D13 : 0xFF332E25, false);
     }
 
-    /** Рисует маленькую иконку предмета (8x8) и число рядом. Возвращает x после неё. */
-    private int drawCost(GuiGraphics graphics, Font font, ItemStack icon, int x, int y, boolean enough) {
-        graphics.pose().pushPose();
-        graphics.pose().translate(x, y - 0.5F, 0);
-        graphics.pose().scale(0.5F, 0.5F, 1.0F);
-        graphics.renderItem(icon, 0, 0);
-        graphics.pose().popPose();
+    /** Сокращает название до максимума букв, которые влезают, и добавляет "...". */
+    private static Component fit(Font font, Component name, int maxWidth) {
+        if (font.width(name) <= maxWidth) return name;
 
-        Component amount = Component.literal(Integer.toString(fuel)).withColor(enough ? 0xFF404040 : INSUFFICIENT_COLOR);
-        graphics.drawString(font, amount, x + 9, y, 0xFF404040, true);
-        return x + 9 + font.width(amount);
+        String full = name.getString();
+        int ellipsisWidth = font.width(Component.literal("...").withStyle(name.getStyle()));
+        int end = full.length();
+        while (end > 0 && font.width(Component.literal(full.substring(0, end)).withStyle(name.getStyle())) + ellipsisWidth > maxWidth) {
+            end--;
+        }
+        return Component.literal(full.substring(0, end).stripTrailing() + "...").withStyle(name.getStyle());
     }
 
     @Override
