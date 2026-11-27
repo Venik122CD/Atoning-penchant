@@ -40,6 +40,8 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
     private static final ResourceLocation BOOK_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("caverns_and_chasms", "textures/entity/atoning_table_book.png");
     private static final ResourceLocation LAPIS_SLOT_ICON = ResourceLocation.withDefaultNamespace("item/empty_slot_lapis_lazuli");
+    private static final ResourceLocation SPINEL_SLOT_ICON =
+            ResourceLocation.fromNamespaceAndPath("caverns_and_chasms", "item/empty_slot_spinel");
     private static final ResourceLocation BOOK_SLOT_ICON = ResourceLocation.fromNamespaceAndPath("penchant", "item/empty_slot_book");
 
     private static final Component ITEM_SLOT_TOOLTIP = Component.translatable("container.atoning_penchant.slot.item");
@@ -57,12 +59,13 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
     private static final int TRACK_HEIGHT = 60;
     private static final int SCROLLER_WIDTH = 6;
     private static final int SCROLLER_HEIGHT = 19;
-    // ---- кинжал (размер картинки 21x39). DAGGER_Y - самое нижнее положение, вверх он «плавает» на DAGGER_BOB
-    private static final int DAGGER_X = 43;
-    private static final int DAGGER_Y = 4;
-    private static final int DAGGER_WIDTH = 21;
-    private static final int DAGGER_HEIGHT = 39;
-    private static final float DAGGER_BOB = 4.0F;
+    // ---- кинжал: картинка 21x39 рисуется уменьшенной в 1.5 раза (14x26) и поднята на 14 пикселей, так что
+    // выступает над верхним краем окна. DAGGER_Y - самое нижнее положение, вверх он «плавает» на DAGGER_BOB
+    private static final int DAGGER_X = 46;
+    private static final int DAGGER_Y = -4;
+    private static final int DAGGER_WIDTH = 14;
+    private static final int DAGGER_HEIGHT = 26;
+    private static final float DAGGER_BOB = 3.0F;
     private static final float DAGGER_PERIOD_TICKS = 62.8F;   // как у кинжала-частицы в C&C (2*pi / 0.1)
     // ---- книга: центр красного квадрата на макете (44..61 x 21..38) и размер (было 30, теперь x1.5)
     private static final float BOOK_X = 53.0F;
@@ -73,6 +76,7 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
     private static final int INFO_Y = 20;
 
     private final CyclingSlotBackground ingredientSlotBackground = new CyclingSlotBackground(AtoningPenchantMenu.INGREDIENT_SLOT);
+    private final CyclingSlotBackground spinelSlotBackground = new CyclingSlotBackground(AtoningPenchantMenu.SPINEL_SLOT);
     private final RandomSource random = RandomSource.create();
     private BookModel bookModel;
 
@@ -112,14 +116,12 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
         return !menu.getDisplayedEnchantments().isEmpty();
     }
 
-    /** Кинжал есть, только когда в слоте лежит предмет и мы зачаровываем (а не снимаем чары). */
-    private boolean isDaggerShown() {
-        return !menu.getEnchantingStack().isEmpty() && menu.isEnchanting();
-    }
-
-    /** Кинжал можно нажимать и он качается, когда книга открыта (есть что выбирать). */
+    /**
+     * Кинжал есть, только когда в слот положили подходящий предмет и книга открылась (есть что выбирать),
+     * и только при зачаровании (при снятии чар уровни не нужны). Он же и качается, и нажимается.
+     */
     private boolean isDaggerActive() {
-        return isDaggerShown() && isBookOpen();
+        return !menu.getEnchantingStack().isEmpty() && menu.isEnchanting() && isBookOpen();
     }
 
     private float daggerAlpha(float partialTick) {
@@ -246,11 +248,12 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
     @Override
     public void containerTick() {
         super.containerTick();
+        spinelSlotBackground.tick(List.of(SPINEL_SLOT_ICON));
         ingredientSlotBackground.tick(menu.canDisenchant() ? List.of(LAPIS_SLOT_ICON, BOOK_SLOT_ICON) : List.of(LAPIS_SLOT_ICON));
         tickBook();
         oDaggerPresence = daggerPresence;
         oDaggerMotion = daggerMotion;
-        daggerPresence = Mth.clamp(daggerPresence + (isDaggerShown() ? 0.1F : -0.1F), 0.0F, 1.0F);
+        daggerPresence = Mth.clamp(daggerPresence + (isDaggerActive() ? 0.1F : -0.1F), 0.0F, 1.0F);
         daggerMotion = Mth.clamp(daggerMotion + (isDaggerActive() ? 0.05F : -0.05F), 0.0F, 1.0F);
     }
 
@@ -286,6 +289,7 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
         graphics.drawString(font, books, leftPos + INFO_X, topPos + INFO_Y, 0xFF606060, false);
         graphics.drawString(font, grindstone, leftPos + INFO_X, topPos + INFO_Y + 11, 0xFF606060, false);
 
+        spinelSlotBackground.render(menu, graphics, partialTick, leftPos, topPos);
         ingredientSlotBackground.render(menu, graphics, partialTick, leftPos, topPos);
 
         int max = maxScroll();

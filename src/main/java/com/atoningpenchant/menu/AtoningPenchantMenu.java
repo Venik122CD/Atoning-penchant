@@ -4,6 +4,8 @@ import com.atoningpenchant.AtoningPenchant;
 import com.atoningpenchant.compat.AtoningCosts;
 import com.atoningpenchant.compat.PenchantBridge;
 import com.atoningpenchant.network.UnlockedEnchantmentsPayload;
+import com.teamabnormals.caverns_and_chasms.common.level.SpinelBoom;
+import com.teamabnormals.caverns_and_chasms.common.network.SpinelBoomPayload;
 import com.teamabnormals.caverns_and_chasms.core.other.CCCriteriaTriggers;
 import com.teamabnormals.caverns_and_chasms.core.other.tags.CCItemTags;
 import com.teamabnormals.caverns_and_chasms.core.registry.CCBlocks;
@@ -16,6 +18,7 @@ import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -45,6 +48,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChiseledBookShelfBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.common.Tags;
+import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.Comparator;
@@ -396,7 +400,7 @@ public class AtoningPenchantMenu extends AbstractContainerMenu {
 
         boolean creative = player.hasInfiniteMaterials();
         int tier = AtoningCosts.effectiveTier(enchantment, requestedTier);
-        int fuel = AtoningCosts.FUEL_COST;
+        int fuel = AtoningCosts.fuelCost(enchantment, tier);
 
         if (!canApply(stack, enchantment)) return false;
         if (!creative) {
@@ -444,14 +448,22 @@ public class AtoningPenchantMenu extends AbstractContainerMenu {
         return true;
     }
 
+    /**
+     * Снятие чары на книгу. Теперь это дорого: 6 шпинели, предмет теряет 25-50% прочности, а сам Атонинг-стол
+     * взрывается (как Bejeweled Anvil в C&C). Игроку остаются зачарованная книга и потрёпанный предмет.
+     */
     private boolean handleDisenchant(Player player, Holder<Enchantment> enchantment) {
         ItemStack stack = getEnchantingStack();
         ItemStack ingredient = getIngredientStack();
         if (stack.isEmpty() || !displayed.contains(enchantment)) return false;
 
-        if (!player.hasInfiniteMaterials()
+        boolean creative = player.hasInfiniteMaterials();
+        int spinelCost = AtoningCosts.EXTRACT_SPINEL_COST;
+
+        if (!creative
                 && (!hasEnchantment(stack, enchantment)
                 || getBookCount() < getBookRequirement(enchantment)
+                || getSpinelCount() < spinelCost
                 || !EnchantmentHelper.isEnchantmentCompatible(
                 EnchantmentHelper.getEnchantmentsForCrafting(ingredient).keySet(), enchantment))) {
             return false;
@@ -461,6 +473,14 @@ public class AtoningPenchantMenu extends AbstractContainerMenu {
             int enchantmentLevel = EnchantmentHelper.getEnchantmentsForCrafting(stack).getLevel(enchantment);
 
             ItemStack newStack = updateEnchantments(stack, mutable -> mutable.set(enchantment, 0));
+            if (!creative) {
+                getSpinelStack().shrink(spinelCost);
+                if (getSpinelStack().isEmpty()) inputSlots.setItem(SPINEL_SLOT, ItemStack.EMPTY);
+
+                if (newStack.isDamageableItem()) {
+                    newStack.setDamageValue(newStack.getDamageValue() + AtoningCosts.rollExtractLoss(random, newStack));
+                }
+            }
             inputSlots.setItem(ITEM_SLOT, newStack);
             inputSlots.setItem(INGREDIENT_SLOT, updateEnchantments(ingredient, mutable -> mutable.set(enchantment, enchantmentLevel)));
 
@@ -468,11 +488,33 @@ public class AtoningPenchantMenu extends AbstractContainerMenu {
                 PenchantBridge.triggerExtractEnchantment(serverPlayer, newStack, enchantment);
             }
 
-            level.playSound(null, pos, SoundEvents.GRINDSTONE_USE, SoundSource.BLOCKS,
-                    1.0F, level.random.nextFloat() * 0.1F + 0.9F);
-            inputSlots.setChanged();
+            explodeTable(level, pos);
+
+            // стола больше нет: закрываем окно, предметы из слотов вернутся игроку (removed -> clearContainer)
+            if (player instanceof ServerPlayer serverPlayer) serverPlayer.closeContainer();
         });
         return true;
+    }
+
+    /** Взрыв стола - один в один как у Bejeweled Anvil в C&C (SpinelBoom, те же частицы и звук). */
+    private static void explodeTable(Level level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (state.is(CCBlocks.ATONING_TABLE.get())) {
+            level.removeBlock(pos, false);
+            level.levelEvent(1029, pos, 0);
+
+            if (level instanceof ServerLevel serverLevel) {
+                SpinelBoom boom = new SpinelBoom(level, null, pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D, 2.0F);
+                if (!EventHooks.onExplosionStart(level, boom)) {
+                    boom.explode();
+                    boom.finalizeExplosion(true);
+                    PacketDistributor.sendToPlayersInDimension(serverLevel, new SpinelBoomPayload(
+                            pos.getX() + 0.5F, pos.getY(), pos.getZ() + 0.5F, 2.0F, boom.getToBlow()));
+                }
+            }
+        } else {
+            level.levelEvent(1030, pos, 0);
+        }
     }
 
     /** Меняет чары предмета или книги (пустая книга <-> зачарованная), как это делает стол Penchant. */

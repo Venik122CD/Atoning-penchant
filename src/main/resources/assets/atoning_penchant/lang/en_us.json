@@ -14,11 +14,14 @@
   "widget.atoning_penchant.row.tooltip.locked": "Not unlocked. Put an enchanted book with it into a chiseled bookshelf near the table.",
   "widget.atoning_penchant.row.tooltip.remove": "Extract %s onto the book",
   "widget.atoning_penchant.row.tooltip.books": "Books required: %s",
-  "widget.atoning_penchant.row.tooltip.spinel": "%s Spinel",
-  "widget.atoning_penchant.row.tooltip.lapis": "%s Lapis Lazuli",
+  "widget.atoning_penchant.row.tooltip.spinel": "Spinel: %s",
+  "widget.atoning_penchant.row.tooltip.lapis": "Lapis Lazuli: %s",
   "widget.atoning_penchant.row.tooltip.durability": "%s-%s%% Durability Loss",
   "widget.atoning_penchant.row.tooltip.may_break": "The item may break!",
   "widget.atoning_penchant.row.tooltip.leveling.0": "Enchantment starts at level 1",
   "widget.atoning_penchant.row.tooltip.leveling.1": "Enchantment starts with a lot of level progress",
-  "widget.atoning_penchant.row.tooltip.leveling.2": "Enchantment starts almost leveled up, or even maxed"
+  "widget.atoning_penchant.row.tooltip.leveling.2": "Enchantment starts almost leveled up, or even maxed",
+  "widget.atoning_penchant.row.incompatible": "✖",
+  "widget.atoning_penchant.row.tooltip.treasure": "Treasure enchantment: costs doubled",
+  "widget.atoning_penchant.row.tooltip.explode": "The Atoning Table will explode!"
 }

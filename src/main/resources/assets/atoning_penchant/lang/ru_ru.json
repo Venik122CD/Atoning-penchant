@@ -20,5 +20,8 @@
   "widget.atoning_penchant.row.tooltip.may_break": "Предмет может сломаться!",
   "widget.atoning_penchant.row.tooltip.leveling.0": "Чара начнётся с 1 уровня",
   "widget.atoning_penchant.row.tooltip.leveling.1": "Чара начнётся с большим прогрессом уровня",
-  "widget.atoning_penchant.row.tooltip.leveling.2": "Чара почти прокачана, а то и сразу максимальная"
+  "widget.atoning_penchant.row.tooltip.leveling.2": "Чара почти прокачана, а то и сразу максимальная",
+  "widget.atoning_penchant.row.incompatible": "✖",
+  "widget.atoning_penchant.row.tooltip.treasure": "Чара из сокровищ: цена вдвое выше",
+  "widget.atoning_penchant.row.tooltip.explode": "Атонинг-стол взорвётся!"
 }

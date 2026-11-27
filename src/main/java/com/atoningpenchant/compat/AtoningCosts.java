@@ -2,6 +2,7 @@ package com.atoningpenchant.compat;
 
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.tags.EnchantmentTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -9,10 +10,11 @@ import net.minecraft.world.item.enchantment.Enchantment;
 /**
  * Правила «уровней сложности» Атонинг-стола (выбираются кинжалом).
  *
- * <p>Лазурит и шпинель - фиксированная цена за одно зачарование ({@link #FUEL_COST}). Прочность - как в
- * Caverns & Chasms: уровень i (1..3) забирает {@code min(100%, 25%*i + random*27.5%)} максимальной прочности.
- * Чем выше уровень, тем больше нужно книг рядом (A, A+25%, A+50%, где A - требование Penchant) и тем лучше
- * «заряжена» чара в системе прокачки Penchant. Все числа класса можно спокойно править.</p>
+ * <p>Лёгкий / нормальный / сложный уровень стоит 1 / 2 / 3 лазурита и шпинели ({@link #fuelCost}), для чар «из
+ * сокровищ» - вдвое больше. Прочность - как в Caverns & Chasms: уровень i (1..3) забирает
+ * {@code min(100%, 25%*i + random*27.5%)} максимальной прочности. Книг нужно рядом A, A+25%A и A+75%A (A -
+ * требование Penchant), а чара получается тем лучше «заряжена» в системе прокачки Penchant, чем выше уровень.
+ * Снятие чары на книгу: 6 шпинели, стол взрывается, предмет теряет 25-50% прочности. Все числа можно править.</p>
  */
 public final class AtoningCosts {
     private AtoningCosts() {}
@@ -31,11 +33,29 @@ public final class AtoningCosts {
 
     // ------------------------------------------------------------------ цены (как в C&C)
 
-    /** Сколько лазурита и сколько шпинели стоит одно зачарование (на любом уровне). */
-    public static final int FUEL_COST = 1;
+    /** Во сколько раз дороже чары из сокровищ (тег minecraft:treasure). */
+    private static final int TREASURE_MULTIPLIER = 2;
 
-    /** Прибавка к требованию по книгам на уровнях: лёгкий +0%, нормальный +25%, сложный +50%. */
-    private static final float[] BOOK_EXTRA = {0.0F, 0.25F, 0.5F};
+    /** Прибавка к требованию по книгам: лёгкий +0%, нормальный +25%, сложный +50% +25% = +75%. */
+    private static final float[] BOOK_EXTRA = {0.0F, 0.25F, 0.75F};
+
+    /** Снятие чары на книгу: шпинель и потеря прочности предмета (доля максимальной прочности). */
+    public static final int EXTRACT_SPINEL_COST = 6;
+    public static final int EXTRACT_MIN_LOSS_PERCENT = 25;
+    public static final int EXTRACT_MAX_LOSS_PERCENT = 50;
+
+    /** Сколько лазурита и сколько шпинели стоит зачарование: 1 / 2 / 3 по уровням, x2 для чар из сокровищ. */
+    public static int fuelCost(Holder<Enchantment> enchantment, int tierIndex) {
+        int base = Math.max(0, Math.min(TIER_COUNT - 1, tierIndex)) + 1;
+        return enchantment.is(EnchantmentTags.TREASURE) ? base * TREASURE_MULTIPLIER : base;
+    }
+
+    /** Сколько прочности (в единицах) забирает снятие чары: 25-50% максимальной, но предмет остаётся целым. */
+    public static int rollExtractLoss(RandomSource random, ItemStack stack) {
+        int percent = EXTRACT_MIN_LOSS_PERCENT + random.nextInt(EXTRACT_MAX_LOSS_PERCENT - EXTRACT_MIN_LOSS_PERCENT + 1);
+        int loss = Math.round(stack.getMaxDamage() * percent / 100.0F);
+        return Math.min(loss, stack.getMaxDamage() - stack.getDamageValue() - 1);
+    }
 
     /**
      * Сколько книг нужно рядом со столом. baseRequirement - это A (требование Penchant для чары),

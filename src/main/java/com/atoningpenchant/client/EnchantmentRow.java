@@ -33,6 +33,8 @@ public class EnchantmentRow extends AbstractButton {
     public static final int DISABLED_COLOR = 0xFF685E4A;
     public static final int INSUFFICIENT_COLOR = 0xFFFF5555;
     public static final int BOOK_COLOR = 0xFFFFAA00;
+    public static final int LAPIS_COLOR = 0xFF5E7BFF;
+    public static final int SPINEL_COLOR = 0xFFD870B8;
 
     private static final int[] TIER_COLORS = {0xFF55FF55, 0xFFFFAA00, 0xFFFF5555};
 
@@ -64,9 +66,11 @@ public class EnchantmentRow extends AbstractButton {
 
         int bookRequirement = disenchanting ? menu.getBookRequirement(enchantment) : menu.getRequiredBooks(enchantment, tier);
         boolean hasEnoughBooks = creative || menu.getBookCount() >= bookRequirement;
-        int fuel = AtoningCosts.FUEL_COST;
-        boolean hasSpinel = creative || menu.getSpinelCount() >= fuel;
-        boolean hasLapis = creative || menu.getLapisCount() >= fuel;
+        // сколько лазурита и шпинели: 1/2/3 по уровням (x2 для чар из сокровищ); снятие чары - 6 шпинели
+        int spinelNeeded = disenchanting ? AtoningCosts.EXTRACT_SPINEL_COST : AtoningCosts.fuelCost(enchantment, tier);
+        int lapisNeeded = disenchanting ? 0 : spinelNeeded;
+        boolean hasSpinel = creative || menu.getSpinelCount() >= spinelNeeded;
+        boolean hasLapis = creative || menu.getLapisCount() >= lapisNeeded;
         boolean showBookCost = unlocked;
 
         // ---- название (ещё не открытые чары пишутся «галактическим» шрифтом, как в столе зачарований)
@@ -74,7 +78,7 @@ public class EnchantmentRow extends AbstractButton {
         if (!unlocked && canUse && !disenchanting) title.withStyle(style -> style.withFont(Minecraft.ALT_FONT));
         this.text = title;
 
-        // ---- цена справа: значок несовместимости и нужное число книг (как у Penchant)
+        // ---- цена справа: значок несовместимости, число книг, затем цифрами лазурит и шпинель
         List<Component> costTexts = new ArrayList<>(2);
         if (!incompatible.isEmpty()) {
             costTexts.add(Component.translatable("widget.atoning_penchant.row.incompatible").withColor(INSUFFICIENT_COLOR));
@@ -82,6 +86,12 @@ public class EnchantmentRow extends AbstractButton {
         if (showBookCost) {
             costTexts.add(Component.literal(Integer.toString(bookRequirement))
                     .withColor(!canUse ? DISABLED_COLOR : !hasEnoughBooks ? INSUFFICIENT_COLOR : BOOK_COLOR));
+            if (!disenchanting) {
+                costTexts.add(Component.literal(Integer.toString(lapisNeeded))
+                        .withColor(!canUse ? DISABLED_COLOR : !hasLapis ? INSUFFICIENT_COLOR : LAPIS_COLOR));
+            }
+            costTexts.add(Component.literal(Integer.toString(spinelNeeded))
+                    .withColor(!canUse ? DISABLED_COLOR : !hasSpinel ? INSUFFICIENT_COLOR : SPINEL_COLOR));
         }
         this.costText = ComponentUtils.formatList(costTexts, Component.literal(" "));
 
@@ -110,10 +120,14 @@ public class EnchantmentRow extends AbstractButton {
             tooltip.append("\n").append(Component.translatable("widget.atoning_penchant.row.tooltip.books", bookRequirement)
                     .withColor(hasEnoughBooks ? BOOK_COLOR : INSUFFICIENT_COLOR));
 
+            // лазурит и шпинель словами: серым, если хватает, красным, если нет (как цены в C&C)
+            tooltip.append("\n").append(fuelLine("widget.atoning_penchant.row.tooltip.spinel", spinelNeeded, hasSpinel));
             if (!disenchanting) {
-                // лазурит и шпинель: серым, если хватает, красным, если нет (как цены в C&C)
-                tooltip.append("\n").append(fuelLine("widget.atoning_penchant.row.tooltip.spinel", fuel, hasSpinel));
-                tooltip.append("\n").append(fuelLine("widget.atoning_penchant.row.tooltip.lapis", fuel, hasLapis));
+                tooltip.append("\n").append(fuelLine("widget.atoning_penchant.row.tooltip.lapis", lapisNeeded, hasLapis));
+                if (enchantment.is(EnchantmentTags.TREASURE)) {
+                    tooltip.append("\n").append(Component.translatable("widget.atoning_penchant.row.tooltip.treasure")
+                            .withStyle(ChatFormatting.DARK_GRAY));
+                }
 
                 if (stack.isDamageableItem()) {
                     tooltip.append("\n").append(Component.translatable("widget.atoning_penchant.row.tooltip.durability",
@@ -128,12 +142,19 @@ public class EnchantmentRow extends AbstractButton {
                     tooltip.append("\n").append(Component.translatable("widget.atoning_penchant.row.tooltip.leveling." + tier)
                             .withStyle(ChatFormatting.DARK_GRAY));
                 }
+            } else {
+                if (stack.isDamageableItem()) {
+                    tooltip.append("\n").append(Component.translatable("widget.atoning_penchant.row.tooltip.durability",
+                            AtoningCosts.EXTRACT_MIN_LOSS_PERCENT, AtoningCosts.EXTRACT_MAX_LOSS_PERCENT).withStyle(ChatFormatting.GRAY));
+                }
+                tooltip.append("\n").append(Component.translatable("widget.atoning_penchant.row.tooltip.explode")
+                        .withStyle(ChatFormatting.DARK_RED));
             }
             setTooltip(Tooltip.create(tooltip));
         }
 
         this.active = canUse && (disenchanting
-                ? hasEnoughBooks
+                ? hasEnoughBooks && hasSpinel
                 : unlocked && incompatible.isEmpty() && hasEnoughBooks && hasSpinel && hasLapis);
     }
 
