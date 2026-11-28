@@ -2,8 +2,8 @@
   "container.atoning_penchant.books": "Books: %s",
   "container.atoning_penchant.slot.item": "Item to atone (must have durability)",
   "container.atoning_penchant.slot.ingredient": "Lapis Lazuli",
-  "container.atoning_penchant.slot.ingredient.disenchant": "Add Lapis Lazuli, or a Book to extract enchantments",
-  "container.atoning_penchant.slot.spinel": "Add Spinel",
+  "container.atoning_penchant.slot.ingredient.disenchant": "Lapis Lazuli, or a Book to extract enchantments",
+  "container.atoning_penchant.slot.spinel": "Spinel",
   "container.atoning_penchant.dagger.tooltip": "Click the dagger to change the enchantment level",
   "container.atoning_penchant.dagger.level": "Level: %s",
   "container.atoning_penchant.tier.0": "Easy",
@@ -21,7 +21,7 @@
   "widget.atoning_penchant.row.tooltip.leveling.0": "Enchantment starts at level 1",
   "widget.atoning_penchant.row.tooltip.leveling.1": "Enchantment starts with a lot of level progress",
   "widget.atoning_penchant.row.tooltip.leveling.2": "Enchantment starts almost leveled up, or even maxed",
-  "widget.atoning_penchant.row.incompatible": "!",
+  "widget.atoning_penchant.row.incompatible": "✖",
   "widget.atoning_penchant.row.tooltip.treasure": "Treasure enchantment: costs doubled",
   "widget.atoning_penchant.row.tooltip.explode": "The Atoning Table will explode!"
 }

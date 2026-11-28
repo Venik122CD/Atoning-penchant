@@ -4,6 +4,7 @@ import com.atoningpenchant.compat.AtoningCosts;
 import com.atoningpenchant.menu.AtoningPenchantMenu;
 import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
@@ -14,6 +15,7 @@ import net.minecraft.client.gui.screens.inventory.CyclingSlotBackground;
 import net.minecraft.client.model.BookModel;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
@@ -24,6 +26,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import org.joml.Matrix4f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,14 +62,16 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
     private static final int TRACK_HEIGHT = 60;
     private static final int SCROLLER_WIDTH = 6;
     private static final int SCROLLER_HEIGHT = 19;
-    // ---- кинжал: картинка 21x39 рисуется уменьшенной в 1.5 раза (14x26) и поднята на 14 пикселей, так что
-    // выступает над верхним краем окна. DAGGER_Y - самое нижнее положение, вверх он «плавает» на DAGGER_BOB
-    private static final int DAGGER_X = 46;
-    private static final int DAGGER_Y = -4;
-    private static final int DAGGER_WIDTH = 14;
-    private static final int DAGGER_HEIGHT = 26;
+    // ---- кинжал (3D-модель): центр в самом нижнем положении, высота в пикселях, размах покачивания
+    private static final float DAGGER_CENTER_X = 53.0F;
+    private static final float DAGGER_CENTER_Y = 9.0F;
+    private static final float DAGGER_HEIGHT = 26.0F;
     private static final float DAGGER_BOB = 3.0F;
     private static final float DAGGER_PERIOD_TICKS = 62.8F;   // как у кинжала-частицы в C&C (2*pi / 0.1)
+    private static final float DAGGER_HOVER_WHITE = 0.5F;     // насколько заливается белым при наведении
+    private static final int SPIN_TICKS = 8;                  // быстрый оборот по клику
+    private static final float TWITCH_ANGLE = 16.0F;          // градусы наклона при «подёргивании»
+    private static final float TWITCH_SHIFT = 1.2F;           // и сдвиг в пикселях
     // ---- книга: центр красного квадрата на макете (44..61 x 21..38) и размер (было 30, теперь x1.5)
     private static final float BOOK_X = 53.0F;
     private static final float BOOK_Y = 30.0F;
@@ -82,7 +87,14 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
 
     private int scroll = 0;
     private boolean draggingScroller = false;
+    private SpinelDaggerModel daggerModel;
+    private Matrix4f daggerMatrix = new Matrix4f();
     private boolean daggerHovered = false;
+    private int spinAge = -1;                  // -1: не крутится
+    private float twitch;
+    private float oTwitch;
+    private float twitchVelocity;
+    private int twitchCooldown = 40;
     /** Появление кинжала (0 - нет, 1 - есть) и «разгон» покачивания (0 - стоит, 1 - качается) с плавными переходами. */
     private float daggerPresence = 0.0F;
     private float oDaggerPresence = 0.0F;
@@ -131,6 +143,7 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
     @Override
     protected void init() {
         super.init();
+        daggerModel = SpinelDaggerModel.load(requireNonNull(minecraft).getResourceManager());
         bookModel = new BookModel(requireNonNull(minecraft).getEntityModels().bakeLayer(ModelLayers.BOOK));
         scroll = Mth.clamp(scroll, 0, maxScroll());
 
@@ -191,9 +204,7 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
     }
 
     private boolean overDagger(double mouseX, double mouseY) {
-        double x = leftPos + DAGGER_X;
-        double y = topPos + DAGGER_Y + daggerBob(lastPartialTick);
-        return mouseX >= x && mouseX < x + DAGGER_WIDTH && mouseY >= y && mouseY < y + DAGGER_HEIGHT;
+        return daggerModel != null && daggerPresence > 0.5F && daggerModel.contains(daggerMatrix, mouseX, mouseY);
     }
 
     private Component tierName(int tierIndex) {
@@ -207,6 +218,7 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && isDaggerActive() && overDagger(mouseX, mouseY)) {
             menu.cycleTier();
+            spinAge = 0;
             requireNonNull(minecraft).getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
             rebuildWidgets();
             return true;
@@ -255,6 +267,20 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
         oDaggerMotion = daggerMotion;
         daggerPresence = Mth.clamp(daggerPresence + (isDaggerActive() ? 0.1F : -0.1F), 0.0F, 1.0F);
         daggerMotion = Mth.clamp(daggerMotion + (isDaggerActive() ? 0.05F : -0.05F), 0.0F, 1.0F);
+        tickDagger();
+    }
+
+    /** Оборот по клику и случайные «подёргивания» кинжала вправо-влево (пружинка с затуханием). */
+    private void tickDagger() {
+        if (spinAge >= 0 && ++spinAge > SPIN_TICKS) spinAge = -1;
+
+        oTwitch = twitch;
+        if (isDaggerActive() && spinAge < 0 && --twitchCooldown <= 0) {
+            twitchVelocity += (random.nextBoolean() ? 1.0F : -1.0F) * (0.7F + random.nextFloat() * 0.5F);
+            twitchCooldown = 50 + random.nextInt(110);
+        }
+        twitchVelocity = (twitchVelocity - twitch * 0.30F) * 0.62F;
+        twitch += twitchVelocity;
     }
 
     /** Анимация книги скопирована из стола Penchant: открыта, если есть что выбирать. */
@@ -298,20 +324,54 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
             graphics.blitSprite(AtoningSprites.SCROLLER, leftPos + SCROLL_X, y, SCROLLER_WIDTH, SCROLLER_HEIGHT);
         }
 
-        // кинжал над книгой: плавно появляется/испаряется, при наведении обводка становится белой
+        renderDagger(graphics, partialTick, mouseX, mouseY);
+    }
+
+    /**
+     * Кинжал как 3D-сущность (модель из Blockbench), как и книга. Покачивается по реальному времени (без рывков),
+     * изредка подёргивается, при клике быстро делает оборот по часовой стрелке (вид сверху), при наведении
+     * заливается белым на 50%.
+     */
+    private void renderDagger(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         lastPartialTick = partialTick;
         float alpha = daggerAlpha(partialTick);
-        daggerHovered = isDaggerActive() && overDagger(mouseX, mouseY);
-        if (alpha > 0.01F) {
-            graphics.pose().pushPose();
-            graphics.pose().translate(leftPos + DAGGER_X, topPos + DAGGER_Y + daggerBob(partialTick), 200.0F);   // поверх книги
-            RenderSystem.enableBlend();
-            graphics.setColor(1.0F, 1.0F, 1.0F, alpha);
-            graphics.blitSprite(daggerHovered ? AtoningSprites.DAGGER_HIGHLIGHTED : AtoningSprites.DAGGER,
-                    0, 0, DAGGER_WIDTH, DAGGER_HEIGHT);
-            graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
-            graphics.pose().popPose();
+        if (daggerModel == null || alpha <= 0.01F) {
+            daggerHovered = false;
+            return;
         }
+
+        float scale = DAGGER_HEIGHT / daggerModel.height;
+        float twitchLerp = Mth.lerp(partialTick, oTwitch, twitch);
+        float spinAngle = 0.0F;
+        if (spinAge >= 0) {
+            float progress = Mth.clamp((spinAge + partialTick) / SPIN_TICKS, 0.0F, 1.0F);
+            spinAngle = 360.0F * (1.0F - (1.0F - progress) * (1.0F - progress) * (1.0F - progress));   // быстро, потом замедляется
+        }
+
+        PoseStack pose = graphics.pose();
+        pose.pushPose();
+        pose.translate(leftPos + DAGGER_CENTER_X + twitchLerp * TWITCH_SHIFT,
+                topPos + DAGGER_CENTER_Y + daggerBob(partialTick), 200.0F);   // поверх книги
+        pose.scale(scale, -scale, scale);
+        pose.mulPose(Axis.ZP.rotationDegrees(twitchLerp * TWITCH_ANGLE));
+        pose.mulPose(Axis.YP.rotationDegrees(spinAngle));
+        pose.translate(-daggerModel.centerX, -daggerModel.centerY, -daggerModel.centerZ);
+
+        daggerMatrix = new Matrix4f(pose.last().pose());
+        daggerHovered = isDaggerActive() && daggerModel.contains(daggerMatrix, mouseX, mouseY);
+
+        int overlay = daggerHovered
+                ? OverlayTexture.pack((int) (DAGGER_HOVER_WHITE * 20.0F), OverlayTexture.v(false))   // 50% белого
+                : OverlayTexture.NO_OVERLAY;
+        int color = (Mth.clamp((int) (alpha * 255.0F), 0, 255) << 24) | 0xFFFFFF;
+
+        Lighting.setupForEntityInInventory();
+        RenderSystem.enableBlend();
+        var consumer = graphics.bufferSource().getBuffer(RenderType.entityTranslucent(SpinelDaggerModel.TEXTURE));
+        daggerModel.render(pose.last(), consumer, color, 15728880, overlay);
+        graphics.flush();
+        Lighting.setupFor3DItems();
+        pose.popPose();
     }
 
     /** Отрисовка сущности книги - логика как в столе Penchant, но с текстурой книги Атонинг-стола из C&C. */

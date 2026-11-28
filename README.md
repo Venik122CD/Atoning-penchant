@@ -44,7 +44,17 @@ All numbers are in `AtoningCosts.java`.
 | `container/atoning_table.png` (window in the top-left corner of a 256x256 canvas) | 206x172 |
 | `sprites/container/atoning_table/button_{easy,normal,hard}[_highlighted].png`, `button_disabled.png` | 91x12 |
 | `sprites/container/atoning_table/scroller.png` | 6x19 |
-| `sprites/container/atoning_table/dagger.png` (cursor away), `dagger_highlighted.png` (cursor on it); drawn at 14x26 | 21x39 |
 
 The book is drawn at the red square of the window texture (centre 53, 30). All layout numbers are constants at the top of
 `AtoningPenchantScreen.java` (`BOOK_*`, `DAGGER_*`, `LIST_*`).
+
+## Dagger (3D model)
+
+The dagger is a real 3D model drawn like the book: `assets/atoning_penchant/models/entity/spinel_dagger.json`
+(Blockbench export) with the texture `textures/entity/spinel_dagger.png` (16x16). Replace both files to change it.
+The mod reads the JSON at runtime, so there is nothing to register.
+
+- it bobs smoothly up and down (the same wave as the C&C dagger particle) and occasionally twitches left or right;
+- hovering fills it with 50% white; clicking makes it spin once, clockwise (seen from above), and cycles the level;
+- constants (`DAGGER_*`, `SPIN_TICKS`, `TWITCH_*`) are at the top of `AtoningPenchantScreen.java`.
+

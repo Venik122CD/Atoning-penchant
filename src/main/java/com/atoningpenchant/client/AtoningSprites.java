@@ -15,8 +15,6 @@ public final class AtoningSprites {
             ResourceLocation.fromNamespaceAndPath(AtoningPenchant.MOD_ID, "textures/gui/container/atoning_table.png");
 
     public static final ResourceLocation SCROLLER = sprite("scroller");
-    public static final ResourceLocation DAGGER = sprite("dagger");
-    public static final ResourceLocation DAGGER_HIGHLIGHTED = sprite("dagger_highlighted");
 
     /** Кнопки: 0 - лёгкая (зелёная), 1 - нормальная (оранжевая), 2 - сложная (красная). */
     public static final WidgetSprites[] BUTTONS = {
