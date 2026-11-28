@@ -65,7 +65,7 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
     // ---- кинжал (3D-модель): центр в самом нижнем положении, высота в пикселях, размах покачивания
     private static final float DAGGER_CENTER_X = 53.0F;
     private static final float DAGGER_CENTER_Y = 9.0F;
-    private static final float DAGGER_HEIGHT = 26.0F;
+    private static final float DAGGER_HEIGHT = 32.5F;   // было 26, теперь x1.25
     private static final float DAGGER_BOB = 3.0F;
     private static final float DAGGER_PERIOD_TICKS = 62.8F;   // как у кинжала-частицы в C&C (2*pi / 0.1)
     private static final float DAGGER_HOVER_WHITE = 0.5F;     // насколько заливается белым при наведении
@@ -219,6 +219,7 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
         if (button == 0 && isDaggerActive() && overDagger(mouseX, mouseY)) {
             menu.cycleTier();
             spinAge = 0;
+            kickTwitch();   // при клике кинжал ещё и подёргивается, как от времени
             requireNonNull(minecraft).getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
             rebuildWidgets();
             return true;
@@ -270,13 +271,18 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
         tickDagger();
     }
 
+    /** Резкий толчок вправо или влево: дальше пружинка сама возвращает кинжал на место. */
+    private void kickTwitch() {
+        twitchVelocity += (random.nextBoolean() ? 1.0F : -1.0F) * (0.7F + random.nextFloat() * 0.5F);
+    }
+
     /** Оборот по клику и случайные «подёргивания» кинжала вправо-влево (пружинка с затуханием). */
     private void tickDagger() {
         if (spinAge >= 0 && ++spinAge > SPIN_TICKS) spinAge = -1;
 
         oTwitch = twitch;
         if (isDaggerActive() && spinAge < 0 && --twitchCooldown <= 0) {
-            twitchVelocity += (random.nextBoolean() ? 1.0F : -1.0F) * (0.7F + random.nextFloat() * 0.5F);
+            kickTwitch();
             twitchCooldown = 50 + random.nextInt(110);
         }
         twitchVelocity = (twitchVelocity - twitch * 0.30F) * 0.62F;
@@ -365,7 +371,8 @@ public class AtoningPenchantScreen extends AbstractContainerScreen<AtoningPencha
                 : OverlayTexture.NO_OVERLAY;
         int color = (Mth.clamp((int) (alpha * 255.0F), 0, 255) << 24) | 0xFFFFFF;
 
-        Lighting.setupForEntityInInventory();
+        // плоское освещение (как у плоских предметов в меню): без направленного затенения граней, то есть без «тени»
+        Lighting.setupForFlatItems();
         RenderSystem.enableBlend();
         var consumer = graphics.bufferSource().getBuffer(RenderType.entityTranslucent(SpinelDaggerModel.TEXTURE));
         daggerModel.render(pose.last(), consumer, color, 15728880, overlay);
